@@ -1,0 +1,1962 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Echo vs Light</title>
+<style>
+:root{
+ --text:#f5fbff;
+ --accent:#91e9ff;
+ --danger:#ff7e7e;
+ --shadow:rgba(4,10,18,0.9);
+}
+
+body{
+ margin:0;
+ overflow:hidden;
+ font-family:monospace;
+ background:radial-gradient(circle at top, #29537d 0%, #122334 45%, #05070d 100%);
+}
+
+canvas{ display:block; }
+
+#dialogue-box,
+#loading{
+ position:absolute;
+ color:var(--text);
+ text-shadow:0 3px 18px var(--shadow);
+}
+
+#level-hud{
+ top:14px;
+ left:14px;
+ min-width:150px;
+ font-size:18px;
+ position:absolute;
+ z-index:3;
+}
+
+#objective-wrap{
+ top:14px;
+ left:50%;
+ transform:translateX(-50%);
+ width:min(70vw, 760px);
+ text-align:center;
+ position:absolute;
+ z-index:3;
+}
+
+#objective{
+ color:var(--accent);
+ font-size:22px;
+ line-height:1.35;
+ font-weight:700;
+}
+
+#boss-ui{
+ top:82px;
+ left:50%;
+ transform:translateX(-50%);
+ width:min(72vw, 760px);
+ position:absolute;
+ z-index:3;
+}
+
+#boss-name{
+ display:block;
+ font-size:14px;
+ letter-spacing:0.18em;
+ text-transform:uppercase;
+ color:#ffb0b0;
+ margin-bottom:8px;
+}
+
+#bottom-hud{
+ left:50%;
+ bottom:16px;
+ transform:translateX(-50%);
+ width:min(88vw, 980px);
+ display:flex;
+ align-items:flex-end;
+ justify-content:space-between;
+ gap:18px;
+ position:absolute;
+ z-index:3;
+}
+
+#bars{
+ flex:1;
+ display:grid;
+ gap:12px;
+}
+
+#controls{
+ min-width:240px;
+ text-align:right;
+ font-size:15px;
+ line-height:1.45;
+ color:#c5ebff;
+}
+
+#dialogue-box{
+ bottom:24px;
+ left:50%;
+ transform:translateX(-50%);
+ padding:16px 18px;
+ border-radius:18px;
+ opacity:0;
+ transition:opacity 0.35s ease;
+ pointer-events:none;
+ max-width:min(78vw, 760px);
+ min-width:min(62vw, 520px);
+ background:rgba(6,14,24,0.68);
+ border:1px solid rgba(163,225,255,0.25);
+ box-shadow:0 16px 50px rgba(0,0,0,0.25);
+ z-index:4;
+}
+#dialogue-layout{
+ display:flex;
+ align-items:center;
+ gap:16px;
+}
+#dialogue-portrait{
+ width:84px;
+ height:84px;
+ border-radius:22px;
+ position:relative;
+ flex:0 0 auto;
+ overflow:hidden;
+ background:linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+ box-shadow:inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+#dialogue-portrait::before,
+#dialogue-portrait::after{
+ content:"";
+ position:absolute;
+ inset:auto;
+}
+#dialogue-portrait.light::before{
+ width:34px;
+ height:34px;
+ border-radius:50%;
+ left:25px;
+ top:14px;
+ background:radial-gradient(circle, #ffffff 0%, #b8f3ff 40%, #74ddff 100%);
+ box-shadow:0 0 22px rgba(124,216,255,0.8);
+}
+#dialogue-portrait.light::after{
+ width:54px;
+ height:54px;
+ left:15px;
+ top:22px;
+ border-radius:50%;
+ border:3px solid rgba(156,236,255,0.75);
+ box-sizing:border-box;
+}
+#dialogue-portrait.echo::before{
+ width:44px;
+ height:44px;
+ left:20px;
+ top:12px;
+ background:linear-gradient(135deg, #ffb1b1, #7a0f0f);
+ clip-path:polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+ filter:drop-shadow(0 0 12px rgba(255,93,93,0.65));
+}
+#dialogue-portrait.echo::after{
+ width:58px;
+ height:58px;
+ left:13px;
+ top:18px;
+ border-radius:18px;
+ box-sizing:border-box;
+ border:2px solid rgba(255,147,147,0.45);
+ transform:rotate(14deg);
+}
+#dialogue-copy{
+ min-width:0;
+}
+#dialogue-speaker{
+ display:block;
+ font-size:14px;
+ letter-spacing:0.18em;
+ text-transform:uppercase;
+ margin-bottom:6px;
+ color:#b7e8ff;
+}
+#dialogue-speaker.echo{
+ color:#ffb3b3;
+}
+#dialogue-line{
+ font-size:22px;
+ line-height:1.45;
+}
+
+#loading{
+ top:14px;
+ right:14px;
+ padding:10px 14px;
+ border-radius:14px;
+ font-size:15px;
+  color:var(--accent);
+ background:rgba(6,14,24,0.68);
+ border:1px solid rgba(163,225,255,0.25);
+ box-shadow:0 16px 50px rgba(0,0,0,0.25);
+ z-index:5;
+}
+
+.warn{ color:var(--danger); }
+.panel-hidden{ opacity:0; pointer-events:none; }
+.hud-label{
+ display:block;
+ font-size:12px;
+ letter-spacing:0.14em;
+ text-transform:uppercase;
+ color:#9dc8e8;
+ margin-bottom:3px;
+}
+.hud-value{
+ display:block;
+ font-size:28px;
+ font-weight:700;
+ line-height:1;
+}
+.hud-row + .hud-row{ margin-top:12px; }
+.status-pill{
+ display:inline-block;
+ margin-top:8px;
+ font-size:14px;
+ line-height:1.2;
+ color:#d4f7ff;
+}
+.status-pill.warn{
+ color:#ffb3b3;
+}
+.meter-label{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ font-size:14px;
+ letter-spacing:0.08em;
+ text-transform:uppercase;
+ color:#bedef4;
+ margin-bottom:6px;
+}
+.hp-bar,
+.stamina-bar,
+.boss-bar{
+ width:100%;
+ height:14px;
+ border-radius:999px;
+ background:rgba(255,255,255,0.16);
+  overflow:hidden;
+ box-shadow:0 0 0 1px rgba(255,255,255,0.06);
+}
+.hp-fill{
+ width:100%;
+ height:100%;
+ background:linear-gradient(90deg, #84f4ff 0%, #5dc0ff 55%, #ff8b8b 100%);
+ transform-origin:left center;
+}
+.stamina-fill{
+ width:100%;
+ height:100%;
+ background:linear-gradient(90deg, #a9ffd7 0%, #7deaa7 55%, #d4ff7c 100%);
+ transform-origin:left center;
+}
+.boss-fill{
+ width:100%;
+ height:100%;
+ background:linear-gradient(90deg, #ff8f8f 0%, #ff5a5a 55%, #ffd0d0 100%);
+ transform-origin:left center;
+}
+.control-key{
+ display:inline-block;
+ min-width:22px;
+ padding:2px 6px;
+ margin-left:6px;
+ border-radius:8px;
+ background:rgba(255,255,255,0.08);
+ color:#fff;
+ text-align:center;
+}
+#title-screen{
+ position:absolute;
+ inset:0;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ z-index:10;
+ background:
+ radial-gradient(circle at top, rgba(123,197,255,0.24) 0%, rgba(11,20,34,0.22) 45%, rgba(4,6,11,0.82) 100%),
+ linear-gradient(180deg, rgba(2,4,7,0.4), rgba(2,4,7,0.86));
+}
+#title-inner{
+ text-align:center;
+ width:min(90vw, 780px);
+}
+#title-eyebrow{
+ font-size:14px;
+ letter-spacing:0.3em;
+ text-transform:uppercase;
+ color:#b1eaff;
+ margin-bottom:14px;
+}
+#title-screen h1{
+ margin:0;
+ font-size:clamp(56px, 11vw, 116px);
+ line-height:0.92;
+ color:#f7fcff;
+ text-shadow:0 8px 32px rgba(0,0,0,0.55);
+}
+#title-sub{
+ margin:22px auto 28px;
+ max-width:32ch;
+ font-size:20px;
+ line-height:1.5;
+ color:#d4ecff;
+}
+#title-actions{
+ display:flex;
+ gap:14px;
+ justify-content:center;
+ flex-wrap:wrap;
+}
+#start-button{
+ border:0;
+ border-radius:999px;
+ padding:14px 28px;
+ font:inherit;
+ font-size:18px;
+ font-weight:700;
+ color:#07263a;
+ background:linear-gradient(135deg, #d8ffff 0%, #7be7ff 100%);
+ cursor:pointer;
+ box-shadow:0 16px 38px rgba(0,0,0,0.32);
+}
+#title-hint{
+ margin-top:18px;
+ font-size:15px;
+ color:#a5cfe8;
+ line-height:1.55;
+}
+.cutscene-hidden{
+ opacity:0 !important;
+ pointer-events:none !important;
+}
+#skip-cutscene{
+ position:absolute;
+ top:18px;
+ right:18px;
+ z-index:9;
+ border:0;
+ border-radius:999px;
+ padding:10px 16px;
+ font:inherit;
+ font-size:15px;
+ font-weight:700;
+ color:#071c2b;
+ background:linear-gradient(135deg, #ffffff 0%, #a9eeff 100%);
+ box-shadow:0 10px 28px rgba(0,0,0,0.28);
+ cursor:pointer;
+}
+#miniboss-layer{
+ position:absolute;
+ inset:0;
+ pointer-events:none;
+ z-index:6;
+}
+.miniboss-health{
+ position:absolute;
+ transform:translate(-50%, -50%);
+ width:110px;
+}
+.miniboss-name{
+ font-size:11px;
+ letter-spacing:0.12em;
+ text-transform:uppercase;
+ text-align:center;
+ color:#ffd0d0;
+ margin-bottom:4px;
+ text-shadow:0 2px 10px rgba(0,0,0,0.9);
+}
+.miniboss-bar{
+ width:100%;
+ height:8px;
+ border-radius:999px;
+ overflow:hidden;
+ background:rgba(10,18,24,0.75);
+ box-shadow:0 0 0 1px rgba(255,255,255,0.08);
+}
+.miniboss-fill{
+ width:100%;
+ height:100%;
+ transform-origin:left center;
+ background:linear-gradient(90deg, #ffb0b0 0%, #ff6868 55%, #ffd0d0 100%);
+}
+</style>
+</head>
+<body>
+
+<div id="title-screen">
+<div id="title-inner">
+<div id="title-eyebrow">Echo vs Light</div>
+<h1>Hold The Valley</h1>
+<div id="title-sub">Stabilize the cores, outrun the corruption, and finish Echo in a close-quarters fight.</div>
+<div id="title-actions">
+<button id="start-button">Start Game</button>
+</div>
+<div id="title-hint">Controls: WASD to move, Shift to sprint, left click to punch, right click to kick.</div>
+</div>
+</div>
+
+<div id="level-hud">
+<div class="hud-row">
+<span class="hud-label">Level</span>
+<span class="hud-value" id="lvl">1</span>
+</div>
+<div class="status-pill panel-hidden" id="status-wrap"><span id="status"></span></div>
+</div>
+
+<div id="objective-wrap" class="panel-hidden">
+<div id="objective"></div>
+</div>
+<div id="boss-ui" class="panel-hidden">
+<span id="boss-name">Echo</span>
+<div class="meter-label"><span>Boss Health</span><span id="boss-hp-text">100 / 100</span></div>
+<div class="boss-bar"><div class="boss-fill" id="boss-fill"></div></div>
+</div>
+<div id="bottom-hud">
+<div id="bars">
+<div>
+<div class="meter-label"><span>Health</span><span id="hp">100 / 100</span></div>
+<div class="hp-bar"><div class="hp-fill" id="hp-fill"></div></div>
+</div>
+<div>
+<div class="meter-label"><span>Stamina</span><span id="stamina-text">100 / 100</span></div>
+<div class="stamina-bar"><div class="stamina-fill" id="stamina-fill"></div></div>
+</div>
+</div>
+<div id="controls">
+<div>Move <span class="control-key">WASD</span></div>
+<div>Punch <span class="control-key">LMB</span></div>
+<div>Kick <span class="control-key">RMB</span></div>
+</div>
+</div>
+<div id="dialogue-box">
+<div id="dialogue-layout">
+<div id="dialogue-portrait" class="light"></div>
+<div id="dialogue-copy">
+<span id="dialogue-speaker">Light</span>
+<div id="dialogue-line"></div>
+</div>
+</div>
+</div>
+<button id="skip-cutscene" class="panel-hidden">Skip Cutscene</button>
+<div id="miniboss-layer"></div>
+<div id="loading">Loading models...</div>
+
+<script type="importmap">
+{
+ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+ }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+// ===== STATE =====
+let level = 1;
+let hp = 100;
+let stamina = 100;
+let cores = [];
+let obstacles = [];
+let boss = null;
+let miniBosses = [];
+let bossMixer = null;
+let playerMixer = null;
+let playerModel = null;
+let playerRunAction = null;
+let playerIdleAction = null;
+let playerPunchAction = null;
+let bossCollisionRadius = 1.85;
+let bossHp = 100;
+const bossMaxHp = 100;
+const maxHp = 100;
+const maxStamina = 100;
+const playerStart = new THREE.Vector3(0, 0, 10);
+const worldRadius = 92;
+let bossFloat = 0;
+let activeCorruptionTimer = null;
+let pendingCorruptionTimeout = null;
+let cutsceneActive = false;
+let levelTransitioning = false;
+let gameOver = false;
+let gameStarted = false;
+let currentAction = "idle";
+let attackCooldown = 0;
+let attackFlash = 0;
+let bossContactCooldown = 0;
+let frameDelta = 0;
+let modelsLoadPromise = null;
+let currentCutsceneController = null;
+
+const clock = new THREE.Clock();
+const loader = new GLTFLoader();
+const MODEL_URLS = {
+ player: "./models/player.glb",
+ boss: "./models/boss.glb"
+};
+const IS_FILE_PROTOCOL = window.location.protocol === "file:";
+
+// ===== DOM =====
+const dialogueBoxEl = document.getElementById("dialogue-box");
+const dialoguePortraitEl = document.getElementById("dialogue-portrait");
+const dialogueSpeakerEl = document.getElementById("dialogue-speaker");
+const dialogueLineEl = document.getElementById("dialogue-line");
+const objectiveEl = document.getElementById("objective");
+const objectiveWrapEl = document.getElementById("objective-wrap");
+const hpEl = document.getElementById("hp");
+const hpFillEl = document.getElementById("hp-fill");
+const staminaTextEl = document.getElementById("stamina-text");
+const staminaFillEl = document.getElementById("stamina-fill");
+const levelEl = document.getElementById("lvl");
+const statusEl = document.getElementById("status");
+const statusWrapEl = document.getElementById("status-wrap");
+const loadingEl = document.getElementById("loading");
+const bossUiEl = document.getElementById("boss-ui");
+const bossFillEl = document.getElementById("boss-fill");
+const bossHpTextEl = document.getElementById("boss-hp-text");
+const titleScreenEl = document.getElementById("title-screen");
+const startButtonEl = document.getElementById("start-button");
+const levelHudEl = document.getElementById("level-hud");
+const bottomHudEl = document.getElementById("bottom-hud");
+const skipCutsceneEl = document.getElementById("skip-cutscene");
+const miniBossLayerEl = document.getElementById("miniboss-layer");
+let statusClearTimer = null;
+
+// ===== SCENE =====
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8ac6ff);
+scene.fog = new THREE.Fog(0x8ac6ff, 38, 150);
+
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 1000);
+camera.position.set(0, 4, 10);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// ===== LIGHT =====
+const sun = new THREE.DirectionalLight(0xfff3d1, 1.8);
+sun.position.set(16, 26, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -30;
+sun.shadow.camera.right = 30;
+sun.shadow.camera.top = 30;
+sun.shadow.camera.bottom = -30;
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0x8fd8ff, 0.85));
+
+const rimLight = new THREE.PointLight(0x7cd8ff, 18, 25, 2);
+rimLight.position.set(0, 5, 0);
+scene.add(rimLight);
+
+// ===== WORLD =====
+const floor = new THREE.Mesh(
+ new THREE.CircleGeometry(120, 96),
+ new THREE.MeshStandardMaterial({
+  color: 0x31583a,
+  roughness: 0.95,
+  metalness: 0.05
+ })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+const floorGlow = new THREE.Mesh(
+ new THREE.RingGeometry(28, 62, 96),
+ new THREE.MeshBasicMaterial({
+  color: 0x5fd8ff,
+  transparent: true,
+  opacity: 0.12,
+  side: THREE.DoubleSide
+ })
+);
+floorGlow.rotation.x = -Math.PI / 2;
+floorGlow.position.y = 0.03;
+scene.add(floorGlow);
+
+function addWorldDetail() {
+ obstacles = [];
+
+ function addObstacle(position, radius) {
+  obstacles.push({ position: position.clone(), radius });
+ }
+
+ for (let i = 0; i < 56; i++) {
+  const rock = new THREE.Mesh(
+   new THREE.DodecahedronGeometry(0.7 + Math.random() * 1.1, 0),
+   new THREE.MeshStandardMaterial({
+    color: new THREE.Color().setHSL(0.58, 0.12, 0.28 + Math.random() * 0.1),
+    roughness: 1
+   })
+  );
+  const angle = Math.random() * Math.PI * 2;
+  const radius = 14 + Math.random() * 68;
+  rock.position.set(Math.cos(angle) * radius, 0.5, Math.sin(angle) * radius);
+  rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+  rock.scale.y = 0.5 + Math.random() * 1.3;
+  rock.castShadow = true;
+  rock.receiveShadow = true;
+  scene.add(rock);
+  addObstacle(rock.position, 0.9 + rock.scale.y * 0.8);
+ }
+
+ for (let i = 0; i < 38; i++) {
+  const group = new THREE.Group();
+  const trunk = new THREE.Mesh(
+   new THREE.CylinderGeometry(0.18, 0.28, 2.4, 8),
+   new THREE.MeshStandardMaterial({ color: 0x6b4a2f, roughness: 1 })
+  );
+  const crown = new THREE.Mesh(
+   new THREE.ConeGeometry(1.2, 2.6, 10),
+   new THREE.MeshStandardMaterial({ color: 0x275f39, roughness: 1 })
+  );
+  trunk.position.y = 1.2;
+  crown.position.y = 3;
+  trunk.castShadow = true;
+  crown.castShadow = true;
+  group.add(trunk, crown);
+  const angle = Math.random() * Math.PI * 2;
+  const radius = 20 + Math.random() * 62;
+  group.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+  group.rotation.y = Math.random() * Math.PI;
+  scene.add(group);
+  addObstacle(group.position, 1.4);
+ }
+}
+
+addWorldDetail();
+
+// ===== PLAYER =====
+const player = new THREE.Group();
+player.position.copy(playerStart);
+scene.add(player);
+
+const playerAnchor = new THREE.Group();
+playerAnchor.position.y = 0;
+player.add(playerAnchor);
+
+const fallbackPlayer = new THREE.Mesh(
+ new THREE.CapsuleGeometry(0.45, 1.1, 8, 16),
+ new THREE.MeshStandardMaterial({
+  color: 0x4aa3ff,
+  emissive: 0x0c2438,
+  roughness: 0.45
+ })
+);
+fallbackPlayer.castShadow = true;
+fallbackPlayer.position.y = 1.05;
+playerAnchor.add(fallbackPlayer);
+
+const aura = new THREE.Mesh(
+ new THREE.TorusGeometry(0.8, 0.08, 16, 40),
+ new THREE.MeshBasicMaterial({ color: 0x9cecff, transparent: true, opacity: 0.55 })
+);
+aura.rotation.x = Math.PI / 2;
+aura.position.y = 0.15;
+player.add(aura);
+
+const lightCompanion = new THREE.Group();
+const lightCore = new THREE.Mesh(
+ new THREE.SphereGeometry(0.24, 18, 18),
+ new THREE.MeshBasicMaterial({ color: 0xf5fdff, transparent: true, opacity: 0.95 })
+);
+const lightHalo = new THREE.Mesh(
+ new THREE.TorusGeometry(0.45, 0.04, 10, 36),
+ new THREE.MeshBasicMaterial({ color: 0x9cecff, transparent: true, opacity: 0.7 })
+);
+const lightGlow = new THREE.PointLight(0xaeeeff, 5, 12, 2);
+lightHalo.rotation.x = Math.PI / 2;
+lightGlow.position.set(0, 0, 0);
+lightCompanion.add(lightCore, lightHalo, lightGlow);
+lightCompanion.position.set(0.95, 1.55, -0.35);
+player.add(lightCompanion);
+
+// ===== INPUT =====
+const keys = {};
+document.addEventListener("keydown", (e) => {
+ keys[e.key.toLowerCase()] = true;
+});
+document.addEventListener("keyup", (e) => {
+ keys[e.key.toLowerCase()] = false;
+});
+document.body.addEventListener("click", () => {
+ if (gameStarted) {
+  document.body.requestPointerLock();
+ }
+});
+document.addEventListener("mousedown", (e) => {
+ if (cutsceneActive || gameOver || (!boss && miniBosses.length === 0)) return;
+ if (e.button === 0) {
+  attemptAttack("punch");
+ } else if (e.button === 2) {
+  attemptAttack("kick");
+ }
+});
+document.addEventListener("contextmenu", (e) => {
+ e.preventDefault();
+});
+startButtonEl.addEventListener("click", () => {
+ beginGame();
+});
+skipCutsceneEl.addEventListener("click", () => {
+ if (currentCutsceneController) {
+  currentCutsceneController.skipped = true;
+ }
+});
+
+let camYaw = Math.PI;
+document.addEventListener("mousemove", (e) => {
+ if (document.pointerLockElement === document.body && !cutsceneActive) {
+  camYaw -= e.movementX * 0.0024;
+ }
+});
+
+// ===== HELPERS =====
+function setObjective(text) {
+ if (!text) {
+  objectiveEl.textContent = "";
+  objectiveWrapEl.classList.add("panel-hidden");
+  return;
+ }
+
+ objectiveEl.textContent = "Objective: " + text;
+ objectiveWrapEl.classList.remove("panel-hidden");
+}
+
+function resetPlayerPosition() {
+ player.position.copy(playerStart);
+ camYaw = Math.PI;
+ setPlayerAction("idle");
+}
+
+function stagePlayer(position, yaw = 0.45) {
+ player.position.set(position.x, position.y ?? 0, position.z);
+ player.rotation.y = yaw + Math.PI;
+ camYaw = yaw;
+}
+
+function setStatus(text, warn = false, sticky = false) {
+ if (statusClearTimer) {
+  clearTimeout(statusClearTimer);
+  statusClearTimer = null;
+ }
+
+ if (!text) {
+  statusEl.textContent = "";
+  statusWrapEl.className = "status-pill panel-hidden";
+  return;
+ }
+
+ statusEl.textContent = text;
+ statusWrapEl.className = warn ? "status-pill warn" : "status-pill";
+
+ if (!sticky) {
+  statusClearTimer = setTimeout(() => {
+   if (!cutsceneActive && !gameOver) {
+    setStatus("");
+   }
+  }, warn ? 1800 : 1400);
+ }
+}
+
+function setCutsceneUi(active) {
+ levelHudEl.classList.toggle("cutscene-hidden", active);
+ objectiveWrapEl.classList.toggle("cutscene-hidden", active);
+ bottomHudEl.classList.toggle("cutscene-hidden", active);
+ bossUiEl.classList.toggle("cutscene-hidden", active);
+ skipCutsceneEl.classList.toggle("panel-hidden", !active);
+ miniBossLayerEl.classList.toggle("cutscene-hidden", active);
+}
+
+function wait(ms) {
+ return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withTimeout(promise, ms, label) {
+ let timeoutId;
+ const timeoutPromise = new Promise((_, reject) => {
+  timeoutId = setTimeout(() => reject(new Error(label + " timed out")), ms);
+ });
+
+ try {
+  return await Promise.race([promise, timeoutPromise]);
+ } finally {
+  clearTimeout(timeoutId);
+ }
+}
+
+async function speak(lines, hold = 1900) {
+ for (const line of lines) {
+  let speaker = "Light";
+  let text = line;
+  const match = /^([^:]+):\s*(.*)$/.exec(line);
+  if (match) {
+   speaker = match[1].trim();
+   text = match[2].trim();
+  }
+
+  const speakerKey = speaker.toLowerCase().includes("echo") ? "echo" : "light";
+  dialoguePortraitEl.className = speakerKey;
+  dialogueSpeakerEl.textContent = speaker;
+  dialogueSpeakerEl.className = speakerKey;
+  dialogueLineEl.textContent = text;
+  dialogueBoxEl.style.opacity = 1;
+  await wait(hold);
+  dialogueBoxEl.style.opacity = 0;
+  await wait(280);
+ }
+}
+
+function facePlayerToward(dx, dz) {
+ if (dx !== 0 || dz !== 0) {
+  player.rotation.y = Math.atan2(dx, dz);
+ }
+}
+
+function setPlayerAction(nextAction) {
+ if (currentAction === nextAction || !playerMixer || !playerIdleAction || !playerRunAction) return;
+ currentAction = nextAction;
+ const from = nextAction === "run" ? playerIdleAction : playerRunAction;
+ const to = nextAction === "run" ? playerRunAction : playerIdleAction;
+ from.fadeOut(0.2);
+ to.enabled = true;
+ to.reset().fadeIn(0.2).play();
+}
+
+function clearCorruptionTimer() {
+ if (activeCorruptionTimer) {
+  clearInterval(activeCorruptionTimer);
+  activeCorruptionTimer = null;
+ }
+ if (pendingCorruptionTimeout) {
+  clearTimeout(pendingCorruptionTimeout);
+  pendingCorruptionTimeout = null;
+ }
+}
+
+function playExplosion(position, color = 0xff7a7a, size = 0.9) {
+ const blast = new THREE.Mesh(
+  new THREE.SphereGeometry(size, 18, 18),
+  new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75 })
+ );
+ blast.position.copy(position);
+ scene.add(blast);
+
+ const start = performance.now();
+ function animateBlast(now) {
+  const t = (now - start) / 380;
+  if (t >= 1) {
+   scene.remove(blast);
+   blast.geometry.dispose();
+   blast.material.dispose();
+   return;
+  }
+  const s = 1 + t * 2.8;
+  blast.scale.setScalar(s);
+  blast.material.opacity = 0.75 * (1 - t);
+  requestAnimationFrame(animateBlast);
+ }
+ requestAnimationFrame(animateBlast);
+}
+
+function spawnParticleBurst(position, color = 0x9cecff, count = 22, speed = 0.08, size = 0.08) {
+ const particles = [];
+ for (let i = 0; i < count; i++) {
+  const particle = new THREE.Mesh(
+   new THREE.SphereGeometry(size + Math.random() * size, 8, 8),
+   new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 })
+  );
+  particle.position.copy(position);
+  particle.userData.velocity = new THREE.Vector3(
+   (Math.random() - 0.5) * speed * 2,
+   Math.random() * speed * 1.8,
+   (Math.random() - 0.5) * speed * 2
+  );
+  scene.add(particle);
+  particles.push(particle);
+ }
+
+ const start = performance.now();
+ function animateParticles(now) {
+  const t = (now - start) / 900;
+  if (t >= 1) {
+   for (const particle of particles) {
+    scene.remove(particle);
+    particle.geometry.dispose();
+    particle.material.dispose();
+   }
+   return;
+  }
+
+  for (const particle of particles) {
+   particle.position.add(particle.userData.velocity);
+   particle.userData.velocity.y -= 0.003;
+   particle.material.opacity = 0.9 * (1 - t);
+  }
+  requestAnimationFrame(animateParticles);
+ }
+ requestAnimationFrame(animateParticles);
+}
+
+function updatePlayerHud() {
+ hpEl.textContent = `${Math.floor(hp)} / ${maxHp}`;
+ hpFillEl.style.transform = `scaleX(${Math.max(hp, 0) / maxHp})`;
+ staminaTextEl.textContent = `${Math.floor(stamina)} / ${maxStamina}`;
+ staminaFillEl.style.transform = `scaleX(${Math.max(stamina, 0) / maxStamina})`;
+}
+
+function showBossUi(show) {
+ bossUiEl.classList.toggle("panel-hidden", !show);
+}
+
+function updateBossHud() {
+ bossHpTextEl.textContent = `${Math.max(0, Math.floor(bossHp))} / ${bossMaxHp}`;
+ bossFillEl.style.transform = `scaleX(${Math.max(bossHp, 0) / bossMaxHp})`;
+}
+
+function createMiniBossHealthBar() {
+ const root = document.createElement("div");
+ root.className = "miniboss-health";
+ root.innerHTML = `
+  <div class="miniboss-name">Echo Fragment</div>
+  <div class="miniboss-bar"><div class="miniboss-fill"></div></div>
+ `;
+ miniBossLayerEl.appendChild(root);
+ return root;
+}
+
+function getAttackTarget() {
+ const targets = [];
+ if (boss) {
+  targets.push({ enemy: boss, hp: bossHp, isMainBoss: true });
+ }
+ for (const miniBoss of miniBosses) {
+  targets.push({ enemy: miniBoss, hp: miniBoss.userData.hp, isMainBoss: false });
+ }
+
+ const inRange = targets
+  .map((target) => ({
+   ...target,
+   distance: player.position.distanceTo(target.enemy.position),
+   radius: target.enemy.userData.collisionRadius ?? bossCollisionRadius
+  }))
+  .sort((a, b) => a.distance - b.distance);
+
+ return inRange[0] ?? null;
+}
+
+function attemptAttack(kind) {
+ if (attackCooldown > 0 || cutsceneActive || levelTransitioning || (!boss && miniBosses.length === 0)) return;
+
+ const staminaCost = kind === "kick" ? 30 : 16;
+ const damage = kind === "kick" ? 16 : 9;
+ const range = kind === "kick" ? 3.1 : 2.35;
+
+ if (stamina < staminaCost) {
+  setStatus("Too exhausted", true);
+  return;
+ }
+
+ stamina = Math.max(0, stamina - staminaCost);
+ updatePlayerHud();
+ attackCooldown = kind === "kick" ? 0.7 : 0.38;
+ attackFlash = kind === "kick" ? 0.32 : 0.2;
+ setStatus(kind === "kick" ? "Kick" : "Punch");
+
+ if (kind === "punch" && playerPunchAction) {
+  playerPunchAction.reset().fadeIn(0.08).play();
+ }
+
+ const target = getAttackTarget();
+ if (target && target.distance <= target.radius + range) {
+  const hitPoint = target.enemy.position.clone().add(new THREE.Vector3(0, 1.5, 0));
+  playExplosion(hitPoint, kind === "kick" ? 0xffb06e : 0x9cecff, kind === "kick" ? 0.9 : 0.55);
+  spawnParticleBurst(hitPoint, kind === "kick" ? 0xffb06e : 0x9cecff, kind === "kick" ? 22 : 14, 0.07, 0.06);
+  target.enemy.position.add(new THREE.Vector3(
+   (target.enemy.position.x - player.position.x) * 0.05,
+   0,
+   (target.enemy.position.z - player.position.z) * 0.05
+  ));
+
+  if (target.isMainBoss) {
+   bossHp = Math.max(0, bossHp - damage);
+   updateBossHud();
+   if (bossHp <= 0) {
+    winBossFight();
+   } else {
+    setStatus(kind === "kick" ? "Solid hit" : "Hit landed");
+   }
+  } else {
+   target.enemy.userData.hp = Math.max(0, target.enemy.userData.hp - damage);
+   if (target.enemy.userData.hp <= 0) {
+    playExplosion(target.enemy.position.clone().add(new THREE.Vector3(0, 0.8, 0)), 0xff8c8c, 1.1);
+    spawnParticleBurst(target.enemy.position.clone().add(new THREE.Vector3(0, 1.0, 0)), 0xff9898, 26, 0.09, 0.08);
+    scene.remove(target.enemy);
+    target.enemy.userData.ui?.remove();
+    miniBosses = miniBosses.filter((enemy) => enemy !== target.enemy);
+    setStatus("Mini-boss down");
+   } else {
+    setStatus(kind === "kick" ? "Solid hit" : "Hit landed");
+   }
+  }
+ }
+}
+
+async function winBossFight() {
+ if (!boss || gameOver) return;
+ gameOver = true;
+ clearCorruptionTimer();
+ showBossUi(false);
+ setObjective("");
+ setStatus("Echo defeated", false, true);
+ scene.remove(boss);
+ boss = null;
+ await playCutscene([
+  {
+   camera: new THREE.Vector3(player.position.x + 2.5, 3.1, player.position.z + 5.2),
+   lookAt: new THREE.Vector3(player.position.x, 1.4, player.position.z),
+   duration: 1200,
+   dialogue: [
+    "Echo: Impossible...",
+    "Echo: The valley was mine.",
+    "Light: Not anymore.",
+    "Light: You broke the cycle."
+   ]
+  }
+ ]);
+ await speak(["Victory."], 2200);
+ setTimeout(() => location.reload(), 1800);
+}
+
+async function beginGame() {
+ if (gameStarted) return;
+ gameStarted = true;
+ titleScreenEl.classList.add("panel-hidden");
+ document.body.requestPointerLock?.();
+ ensureModelsLoading();
+ await startLevel();
+}
+
+async function playCutscene(steps) {
+ cutsceneActive = true;
+ currentCutsceneController = { skipped: false };
+ document.exitPointerLock?.();
+ setCutsceneUi(true);
+ setStatus("Cutscene", false, true);
+ for (const step of steps) {
+  if (currentCutsceneController.skipped) break;
+  if (step.lookAt) {
+   camera.lookAt(step.lookAt.x, step.lookAt.y, step.lookAt.z);
+  }
+
+  const duration = step.duration ?? 1800;
+  const fromPos = camera.position.clone();
+  const toPos = step.camera ? step.camera.clone() : fromPos.clone();
+  const start = performance.now();
+
+  await new Promise((resolve) => {
+   function frame(now) {
+    if (currentCutsceneController?.skipped) {
+      resolve();
+      return;
+    }
+    const t = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - t, 3);
+    camera.position.lerpVectors(fromPos, toPos, eased);
+
+    if (step.lookAt) {
+      camera.lookAt(step.lookAt.x, step.lookAt.y, step.lookAt.z);
+    }
+
+    if (t >= 1) {
+      resolve();
+      return;
+    }
+    requestAnimationFrame(frame);
+   }
+   requestAnimationFrame(frame);
+  });
+
+  if (step.onReach) {
+    step.onReach();
+  }
+
+  if (step.particles) {
+   spawnParticleBurst(step.particles.position, step.particles.color, step.particles.count, step.particles.speed, step.particles.size);
+  }
+
+  if (currentCutsceneController.skipped) {
+   break;
+  }
+
+  if (step.dialogue) {
+   await speak(step.dialogue, step.dialogueHold ?? 2300);
+  } else if (step.pause) {
+   await wait(step.pause);
+  }
+ }
+ cutsceneActive = false;
+ currentCutsceneController = null;
+ setCutsceneUi(false);
+ setStatus("");
+}
+
+// ===== MODELS =====
+function prepareModel(root, scale) {
+ root.scale.setScalar(scale);
+ root.traverse((obj) => {
+  if (obj.isMesh) {
+   obj.castShadow = true;
+   obj.receiveShadow = true;
+  }
+ });
+ return root;
+}
+
+function groundModel(root) {
+ const bounds = new THREE.Box3().setFromObject(root);
+ if (Number.isFinite(bounds.min.y)) {
+  root.position.y -= bounds.min.y;
+ }
+ return bounds;
+}
+
+function getHorizontalRadius(object, minRadius = 1) {
+ const bounds = new THREE.Box3().setFromObject(object);
+ const size = new THREE.Vector3();
+ bounds.getSize(size);
+ return Math.max(minRadius, Math.max(size.x, size.z) * 0.5);
+}
+
+function findClip(animations, names) {
+ for (const name of names) {
+  const clip = THREE.AnimationClip.findByName(animations, name);
+  if (clip) return clip;
+ }
+
+ for (const clip of animations) {
+  const lower = clip.name.toLowerCase();
+  if (names.some((name) => lower.includes(name.toLowerCase()))) {
+   return clip;
+  }
+ }
+
+ return null;
+}
+
+async function loadPlayerModel() {
+ try {
+ const playerGltf = await withTimeout(loader.loadAsync(MODEL_URLS.player), 4500, "Player model");
+  playerModel = prepareModel(playerGltf.scene, 0.42);
+  groundModel(playerModel);
+  fallbackPlayer.visible = false;
+  playerAnchor.add(playerModel);
+
+ playerMixer = new THREE.AnimationMixer(playerModel);
+ const idleClip = findClip(playerGltf.animations, ["Idle"]);
+ const runClip = findClip(playerGltf.animations, ["Run"]);
+  const punchClip = findClip(playerGltf.animations, ["Punch"]);
+
+ if (idleClip && runClip) {
+   playerIdleAction = playerMixer.clipAction(idleClip);
+   playerRunAction = playerMixer.clipAction(runClip);
+   playerIdleAction.enabled = true;
+   playerRunAction.enabled = true;
+   playerIdleAction.play();
+   currentAction = "idle";
+  }
+
+  if (punchClip) {
+   playerPunchAction = playerMixer.clipAction(punchClip);
+   playerPunchAction.setLoop(THREE.LoopOnce, 1);
+   playerPunchAction.clampWhenFinished = true;
+  }
+
+  return true;
+ } catch (error) {
+  console.warn("Player model loading failed, using fallback", error);
+  return false;
+ }
+}
+
+async function loadModels() {
+ if (IS_FILE_PROTOCOL) {
+  loadingEl.textContent = "Open through http:// localhost to load GLB files";
+  setStatus("Local server required for models", true);
+  setObjective("Run a local server, then open this page over http://localhost");
+  setTimeout(() => {
+   loadingEl.style.opacity = "0";
+   setTimeout(() => loadingEl.remove(), 350);
+  }, 2600);
+  return;
+ }
+
+ loadingEl.textContent = "Loading local player model...";
+ const playerLoaded = await loadPlayerModel();
+ loadingEl.textContent = playerLoaded ? "Player model ready" : "Missing ./models/player.glb, using fallback";
+ setTimeout(() => {
+  loadingEl.style.opacity = "0";
+  setTimeout(() => loadingEl.remove(), 350);
+ }, playerLoaded ? 500 : 1200);
+}
+
+function ensureModelsLoading() {
+ if (!modelsLoadPromise) {
+  modelsLoadPromise = loadModels();
+ }
+ return modelsLoadPromise;
+}
+
+function createBossFallback() {
+ const group = new THREE.Group();
+ const shell = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(1.7, 1),
+  new THREE.MeshStandardMaterial({
+   color: 0x581212,
+   emissive: 0x2e0606,
+   roughness: 0.2,
+   metalness: 0.25
+  })
+ );
+ const ring = new THREE.Mesh(
+  new THREE.TorusGeometry(2.25, 0.12, 18, 48),
+  new THREE.MeshBasicMaterial({
+   color: 0xff7979,
+   transparent: true,
+   opacity: 0.6
+  })
+ );
+ shell.castShadow = true;
+ ring.rotation.x = Math.PI / 2;
+ group.add(shell, ring);
+ group.userData.collisionRadius = 2.2;
+ return group;
+}
+
+async function attachBossModel(host) {
+ if (IS_FILE_PROTOCOL) {
+  const fallback = createBossFallback();
+  host.add(fallback);
+  bossCollisionRadius = fallback.userData.collisionRadius ?? 2.2;
+  return;
+ }
+
+ try {
+  const bossGltf = await withTimeout(loader.loadAsync(MODEL_URLS.boss), 4500, "Boss model");
+  const bossModel = prepareModel(bossGltf.scene, 1.8);
+  bossModel.rotation.y = Math.PI;
+  groundModel(bossModel);
+  host.add(bossModel);
+  bossCollisionRadius = getHorizontalRadius(bossModel, 2.1);
+ } catch (error) {
+  console.warn("Boss model loading failed, using fallback", error);
+  const fallback = createBossFallback();
+  host.add(fallback);
+  bossCollisionRadius = fallback.userData.collisionRadius ?? 2.2;
+ }
+}
+
+async function spawnMiniBoss(x, z, scale = 1.05, hpValue = 28, speed = 0.0065) {
+ const miniBoss = new THREE.Group();
+ miniBoss.position.set(x, 0, z);
+  miniBoss.userData = {
+  hp: hpValue,
+  maxHp: hpValue,
+  speed,
+  collisionRadius: 1.5,
+  bobOffset: Math.random() * Math.PI * 2,
+  ui: createMiniBossHealthBar()
+ };
+ scene.add(miniBoss);
+
+ const aura = new THREE.Mesh(
+  new THREE.TorusGeometry(1.5, 0.08, 14, 36),
+  new THREE.MeshBasicMaterial({
+   color: 0xff9d9d,
+   transparent: true,
+   opacity: 0.5
+  })
+ );
+ aura.rotation.x = Math.PI / 2;
+ miniBoss.add(aura);
+
+ try {
+  const bossGltf = await withTimeout(loader.loadAsync(MODEL_URLS.boss), 4500, "Mini-boss model");
+  const bossModel = prepareModel(bossGltf.scene, scale);
+  bossModel.rotation.y = Math.PI;
+  groundModel(bossModel);
+  miniBoss.add(bossModel);
+  miniBoss.userData.collisionRadius = getHorizontalRadius(bossModel, 1.5);
+ } catch (error) {
+  const fallback = createBossFallback();
+  fallback.scale.setScalar(0.72);
+  miniBoss.add(fallback);
+  miniBoss.userData.collisionRadius = 1.6;
+ }
+
+ miniBosses.push(miniBoss);
+ return miniBoss;
+}
+
+// ===== CORE =====
+function createCoreVisual() {
+ const group = new THREE.Group();
+ const shell = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(0.95, 1),
+  new THREE.MeshStandardMaterial({
+   color: 0x7df9ff,
+   emissive: 0x144d52,
+   roughness: 0.25,
+   metalness: 0.15
+  })
+ );
+ const orbit = new THREE.Mesh(
+  new THREE.TorusGeometry(1.25, 0.06, 8, 40),
+  new THREE.MeshBasicMaterial({
+   color: 0xa3f7ff,
+   transparent: true,
+   opacity: 0.85
+  })
+ );
+ const beam = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.1, 0.35, 2.8, 18, 1, true),
+  new THREE.MeshBasicMaterial({
+   color: 0x86f7ff,
+   transparent: true,
+   opacity: 0.18,
+   side: THREE.DoubleSide
+  })
+ );
+ shell.castShadow = true;
+ orbit.rotation.x = Math.PI / 2;
+ group.add(shell, orbit, beam);
+ return { group, shell, orbit, beam };
+}
+
+function spawnCore(x, z) {
+ const visual = createCoreVisual();
+ visual.group.position.set(x, 1, z);
+ visual.group.userData = {
+  life: 1,
+  unstable: false,
+  shell: visual.shell,
+  orbit: visual.orbit,
+  beam: visual.beam,
+  baseY: 1,
+  collisionRadius: 1.05,
+  offset: Math.random() * Math.PI * 2
+ };
+ scene.add(visual.group);
+ cores.push(visual.group);
+}
+
+// ===== COLLISION =====
+function collide(pos, radius) {
+ if (new THREE.Vector2(pos.x, pos.z).length() > worldRadius) {
+  return true;
+ }
+
+ for (const c of cores) {
+  const coreRadius = c.userData.collisionRadius ?? 1.05;
+  if (pos.distanceTo(c.position) < radius + coreRadius) {
+   return true;
+  }
+ }
+
+ for (const obstacle of obstacles) {
+  if (new THREE.Vector2(pos.x - obstacle.position.x, pos.z - obstacle.position.z).length() < radius + obstacle.radius) {
+   return true;
+  }
+ }
+
+ if (boss && pos.distanceTo(boss.position) < radius + bossCollisionRadius) {
+  return true;
+ }
+
+ for (const miniBoss of miniBosses) {
+  const miniRadius = miniBoss.userData.collisionRadius ?? 1.5;
+  if (pos.distanceTo(miniBoss.position) < radius + miniRadius) {
+   return true;
+  }
+ }
+
+ return false;
+}
+
+// ===== MOVEMENT =====
+function move() {
+ if (cutsceneActive) {
+  setPlayerAction("idle");
+  return;
+ }
+
+ const sprinting = keys["shift"] && stamina > 6;
+ const speed = sprinting ? 0.26 : 0.14;
+ const f = (keys["w"] ? 1 : 0) - (keys["s"] ? 1 : 0);
+ const r = (keys["d"] ? 1 : 0) - (keys["a"] ? 1 : 0);
+ const moving = f !== 0 || r !== 0;
+
+ if (!moving) {
+  setPlayerAction("idle");
+  return;
+ }
+
+ const s = Math.sin(camYaw);
+ const c = Math.cos(camYaw);
+
+ const dx = -s * f + c * r;
+ const dz = -c * f - s * r;
+
+ if (sprinting && moving) {
+  stamina = Math.max(0, stamina - 24 * frameDelta);
+ }
+
+  const nx = player.position.x + dx * speed;
+  const nz = player.position.z + dz * speed;
+
+ facePlayerToward(dx, dz);
+ setPlayerAction(attackCooldown > 0 ? "idle" : "run");
+
+ if (!collide(new THREE.Vector3(nx, 0, player.position.z), 0.85)) {
+  player.position.x = nx;
+ }
+
+ if (!collide(new THREE.Vector3(player.position.x, 0, nz), 0.85)) {
+  player.position.z = nz;
+ }
+}
+
+// ===== CAMERA =====
+let camDist = 7.5;
+
+function followCamera() {
+ if (cutsceneActive) return;
+
+ const x = player.position.x + Math.sin(camYaw) * camDist;
+ const z = player.position.z + Math.cos(camYaw) * camDist;
+ const y = 3 + camDist * 0.16;
+
+ camera.position.lerp(new THREE.Vector3(x, y, z), 0.1);
+ camera.lookAt(player.position.x, 1.5, player.position.z);
+}
+
+function updateCombat(delta) {
+ attackCooldown = Math.max(0, attackCooldown - delta);
+ attackFlash = Math.max(0, attackFlash - delta);
+ bossContactCooldown = Math.max(0, bossContactCooldown - delta);
+ stamina = Math.min(maxStamina, stamina + (level === 5 ? 14 : 22) * delta);
+ updatePlayerHud();
+
+ if (attackFlash > 0) {
+  aura.material.opacity = 0.72;
+ } else {
+  aura.material.opacity = 0.35 + Math.sin(clock.elapsedTime * 2.2) * 0.12;
+ }
+}
+
+// ===== CORE UPDATE =====
+function updateCores(time) {
+ for (const c of cores) {
+  const data = c.userData;
+  const pulse = 1 + Math.sin(time * 2.8 + data.offset) * 0.14;
+  const bob = Math.sin(time * 1.7 + data.offset) * 0.22;
+  c.position.y = data.baseY + bob;
+  data.orbit.rotation.z += 0.016;
+  data.orbit.rotation.y += 0.01;
+  c.scale.setScalar(pulse);
+
+  if (data.unstable) {
+   data.life -= 0.0011;
+   const damageScale = Math.max(data.life, 0.18);
+   c.scale.multiplyScalar(damageScale);
+   data.shell.material.color.lerp(new THREE.Color(0xff6464), 0.06);
+   data.shell.material.emissive.lerp(new THREE.Color(0x5c0808), 0.05);
+   data.beam.material.color.lerp(new THREE.Color(0xff9898), 0.04);
+
+   if (data.life <= 0) {
+    playExplosion(c.position, 0xff6f6f, 1);
+    spawnParticleBurst(c.position, 0xff8b8b, 28, 0.11, 0.11);
+    hp = Math.max(0, hp - 12);
+    updatePlayerHud();
+    setStatus("A core collapsed", true);
+    scene.remove(c);
+    cores = cores.filter((core) => core !== c);
+   }
+  }
+ }
+}
+
+// ===== CORRUPTION =====
+async function triggerCorruptionEvent(autoDialogue = true) {
+ if (!cores.length || cutsceneActive || levelTransitioning || gameOver) return;
+
+ const stableCores = cores.filter((core) => !core.userData.unstable);
+ const target = (stableCores.length ? stableCores : cores)[Math.floor(Math.random() * (stableCores.length ? stableCores.length : cores.length))];
+
+ target.userData.unstable = true;
+ setStatus("Core collapsing", true);
+
+ await playCutscene([
+  {
+   camera: new THREE.Vector3(target.position.x + 2.4, target.position.y + 1.8, target.position.z + 2.4),
+   lookAt: new THREE.Vector3(target.position.x, target.position.y, target.position.z),
+   duration: 1550,
+   onReach: () => {
+    playExplosion(target.position.clone().add(new THREE.Vector3(0, 0.3, 0)), 0xff8b8b, 0.6);
+    spawnParticleBurst(target.position.clone().add(new THREE.Vector3(0, 0.5, 0)), 0xff9f9f, 30, 0.09, 0.09);
+   },
+   particles: {
+    position: target.position.clone().add(new THREE.Vector3(0, 0.8, 0)),
+    color: 0xff9898,
+    count: 18,
+    speed: 0.07,
+    size: 0.08
+   },
+   dialogue: autoDialogue ? [
+    "Light: One of the cores is destabilizing!",
+    "Echo: Let it break."
+   ] : null
+  }
+ ]);
+
+ setStatus("Explore");
+}
+
+// ===== BOSS =====
+async function spawnBoss() {
+ boss = new THREE.Group();
+ boss.position.set(0, 0, -12);
+ bossHp = bossMaxHp;
+ scene.add(boss);
+
+ const aura = new THREE.Mesh(
+  new THREE.TorusGeometry(2.6, 0.11, 14, 48),
+  new THREE.MeshBasicMaterial({
+   color: 0xff8d8d,
+   transparent: true,
+   opacity: 0.55
+  })
+ );
+ aura.rotation.x = Math.PI / 2;
+ boss.add(aura);
+
+ await attachBossModel(boss);
+ updateBossHud();
+ showBossUi(true);
+
+ await playCutscene([
+  {
+   camera: new THREE.Vector3(0, 3.2, -4.5),
+   lookAt: new THREE.Vector3(0, 2.6, -12),
+   duration: 2400,
+   onReach: () => {
+    playExplosion(new THREE.Vector3(0, 2.4, -12), 0xff7b7b, 1.4);
+    spawnParticleBurst(new THREE.Vector3(0, 2.4, -12), 0xff8c8c, 44, 0.11, 0.12);
+    boss.position.z = -3;
+   },
+   particles: {
+    position: new THREE.Vector3(0, 2.8, -12),
+    color: 0xff9d9d,
+    count: 24,
+    speed: 0.08,
+    size: 0.09
+   },
+   dialogue: [
+    "Echo: You made it farther than the others.",
+    "Echo: I can still close my hand around this valley.",
+    "Light: Keep moving. Don't let it pin you down.",
+    "Light: Stay beside me and hit hard when it overextends."
+   ]
+  }
+ ]);
+}
+
+function updateBoss(time) {
+ if (!boss || gameOver || cutsceneActive || levelTransitioning) return;
+
+ bossFloat += 0.02;
+ boss.position.y = 0.25 + Math.sin(bossFloat + time) * 0.18;
+
+ const chaseTarget = player.position.clone();
+ chaseTarget.y = boss.position.y;
+ boss.position.lerp(chaseTarget, 0.0042 + level * 0.0005);
+
+ const dx = player.position.x - boss.position.x;
+ const dz = player.position.z - boss.position.z;
+ if (dx !== 0 || dz !== 0) {
+  const targetYaw = Math.atan2(dx, dz);
+  boss.rotation.y = THREE.MathUtils.lerp(boss.rotation.y, targetYaw, 0.08);
+ }
+
+ if (player.position.distanceTo(boss.position) < bossCollisionRadius + 0.35 && bossContactCooldown <= 0) {
+  hp = Math.max(0, hp - 8);
+  bossContactCooldown = 1.35;
+  updatePlayerHud();
+  setStatus("Under attack", true);
+  const push = new THREE.Vector3(player.position.x - boss.position.x, 0, player.position.z - boss.position.z);
+  if (push.lengthSq() > 0) {
+   push.normalize().multiplyScalar(3.4);
+   const escapeTarget = player.position.clone().add(push);
+   if (!collide(escapeTarget, 0.85)) {
+    player.position.copy(escapeTarget);
+   } else {
+    const sideways = new THREE.Vector3(-push.z, 0, push.x).normalize().multiplyScalar(2.4);
+    const sideTargetA = player.position.clone().add(sideways);
+    const sideTargetB = player.position.clone().sub(sideways);
+    if (!collide(sideTargetA, 0.85)) {
+     player.position.copy(sideTargetA);
+    } else if (!collide(sideTargetB, 0.85)) {
+     player.position.copy(sideTargetB);
+    }
+   }
+  }
+
+  if (hp <= 0) {
+   gameOver = true;
+   setStatus("Signal lost", true);
+   speak(["Light: We failed..."]).then(() => location.reload());
+  }
+ }
+}
+
+function updateMiniBosses(time) {
+ if (gameOver || cutsceneActive || levelTransitioning) return;
+
+ for (const miniBoss of miniBosses) {
+  miniBoss.position.y = 0.18 + Math.sin(time * 2 + miniBoss.userData.bobOffset) * 0.12;
+  const chaseTarget = player.position.clone();
+  chaseTarget.y = miniBoss.position.y;
+  miniBoss.position.lerp(chaseTarget, miniBoss.userData.speed);
+
+  const dx = player.position.x - miniBoss.position.x;
+  const dz = player.position.z - miniBoss.position.z;
+  if (dx !== 0 || dz !== 0) {
+   const targetYaw = Math.atan2(dx, dz);
+   miniBoss.rotation.y = THREE.MathUtils.lerp(miniBoss.rotation.y, targetYaw, 0.08);
+  }
+
+  if (player.position.distanceTo(miniBoss.position) < (miniBoss.userData.collisionRadius ?? 1.5) + 0.25 && bossContactCooldown <= 0) {
+   hp = Math.max(0, hp - 6);
+   bossContactCooldown = 0.95;
+   updatePlayerHud();
+   setStatus("Mini-boss strike", true);
+   const push = new THREE.Vector3(player.position.x - miniBoss.position.x, 0, player.position.z - miniBoss.position.z);
+   if (push.lengthSq() > 0) {
+    push.normalize().multiplyScalar(2.2);
+    const escapeTarget = player.position.clone().add(push);
+    if (!collide(escapeTarget, 0.85)) {
+     player.position.copy(escapeTarget);
+    }
+   }
+
+  if (hp <= 0) {
+   gameOver = true;
+   setStatus("Signal lost", true);
+   speak(["Light: We failed..."]).then(() => location.reload());
+  }
+ }
+
+  const ui = miniBoss.userData.ui;
+  if (ui) {
+   const projected = miniBoss.position.clone().add(new THREE.Vector3(0, 2.3, 0)).project(camera);
+   const onScreen = projected.z > -1 && projected.z < 1;
+   ui.style.display = onScreen ? "block" : "none";
+   if (onScreen) {
+    ui.style.left = `${(projected.x * 0.5 + 0.5) * innerWidth}px`;
+    ui.style.top = `${(-projected.y * 0.5 + 0.5) * innerHeight}px`;
+    const fill = ui.querySelector(".miniboss-fill");
+    fill.style.transform = `scaleX(${Math.max(miniBoss.userData.hp, 0) / miniBoss.userData.maxHp})`;
+   }
+  }
+ }
+}
+
+// ===== LEVELS =====
+async function startLevel() {
+ levelTransitioning = true;
+ clearCorruptionTimer();
+ resetPlayerPosition();
+ levelEl.textContent = level;
+ setStatus(level === 5 ? "Final encounter" : "", level === 5, level === 5);
+
+ for (const c of cores) {
+  scene.remove(c);
+ }
+ cores = [];
+ for (const miniBoss of miniBosses) {
+  miniBoss.userData.ui?.remove();
+  scene.remove(miniBoss);
+ }
+ miniBosses = [];
+
+ if (boss) {
+   scene.remove(boss);
+   boss = null;
+   bossMixer = null;
+   showBossUi(false);
+ }
+
+ if (level === 1) {
+  stagePlayer(new THREE.Vector3(0, 0, 9), 0.18);
+  spawnCore(5, 0);
+  setObjective("Reach the first core");
+  await playCutscene([
+   {
+    camera: new THREE.Vector3(2.4, 2.9, 11.8),
+    lookAt: new THREE.Vector3(0.95, 1.55, 8.65),
+    duration: 2100,
+    particles: {
+     position: new THREE.Vector3(0.95, 1.7, 8.65),
+     color: 0xaeeeff,
+     count: 24,
+     speed: 0.06,
+     size: 0.07
+    },
+    dialogue: [
+     "Light: I'm Light. I held this valley together before Echo found a way inside.",
+     "Light: Stay near me and I'll guide you to every core."
+    ]
+   },
+   {
+    camera: new THREE.Vector3(9.4, 4.2, 2.2),
+    lookAt: new THREE.Vector3(5, 1.2, 0),
+    duration: 2200,
+    particles: {
+     position: new THREE.Vector3(5, 1.8, 0),
+     color: 0xff9a9a,
+     count: 22,
+     speed: 0.07,
+     size: 0.08
+    },
+    dialogue: [
+     "Echo: And I'm Echo.",
+     "Echo: I don't protect this place. I teach it how to collapse."
+    ]
+   },
+   {
+    camera: new THREE.Vector3(2, 3.2, 12),
+    lookAt: new THREE.Vector3(0, 1.3, 7),
+    duration: 2200,
+    particles: {
+     position: new THREE.Vector3(0, 2.2, 7),
+     color: 0x9cecff,
+     count: 20,
+     speed: 0.06,
+     size: 0.08
+    },
+     dialogue: [
+      "Light: Echo found the valley first.",
+      "Light: These cores are the only thing holding the valley together.",
+      "Light: Stay close. Touch them before the corruption spreads."
+     ]
+   },
+   {
+     camera: new THREE.Vector3(8.2, 3.4, 4.5),
+     lookAt: new THREE.Vector3(5, 1, 0),
+     duration: 1700,
+     dialogue: [
+      "Echo: Try to keep up.",
+      "Echo: You are already late."
+     ]
+    }
+   ]);
+  }
+
+ if (level === 2) {
+  stagePlayer(new THREE.Vector3(-1.5, 0, 10.5), 0.06);
+  spawnCore(5, 0);
+  setObjective("Stabilize the core and survive the first Echo fragment");
+  await playCutscene([
+   {
+    camera: new THREE.Vector3(1.5, 3.6, 12.8),
+    lookAt: new THREE.Vector3(0, 1.2, 8.8),
+    duration: 1800,
+    particles: {
+     position: new THREE.Vector3(2.5, 2.4, 5),
+     color: 0x9cecff,
+     count: 18,
+     speed: 0.06,
+     size: 0.08
+    },
+    dialogue: [
+     "Light: The next core is weaker.",
+     "Light: If it breaks, the corruption will hit us directly.",
+     "Echo: Then let's test your footing with something small first."
+    ]
+   }
+  ]);
+  await spawnMiniBoss(2.6, -2.6, 0.84, 22, 0.0056);
+  pendingCorruptionTimeout = setTimeout(() => {
+   triggerCorruptionEvent();
+  }, 2500);
+ }
+
+ if (level === 3) {
+  stagePlayer(new THREE.Vector3(0, 0, 11), 0.12);
+  spawnCore(4, 0);
+  spawnCore(-4, 2);
+  setObjective("Stabilize both cores and clear the Echo fragments");
+  await playCutscene([
+   {
+    camera: new THREE.Vector3(0.5, 4.1, 14),
+    lookAt: new THREE.Vector3(0, 1.2, 5),
+    duration: 1900,
+    particles: {
+     position: new THREE.Vector3(0, 2.3, 5),
+     color: 0x8fe9ff,
+     count: 20,
+     speed: 0.07,
+     size: 0.08
+    },
+    dialogue: [
+     "Light: Two cores. Two fronts.",
+     "Echo: Split your focus and watch everything fail.",
+     "Light: Don't listen. Move fast and keep them stable."
+    ]
+   }
+  ]);
+  await spawnMiniBoss(2.8, -3.5, 0.92, 26, 0.0058);
+  await spawnMiniBoss(-3.6, -5.6, 0.86, 24, 0.0062);
+  activeCorruptionTimer = setInterval(() => {
+   triggerCorruptionEvent(false);
+  }, 6200);
+ }
+
+ if (level === 4) {
+  stagePlayer(new THREE.Vector3(0, 0, 12), 0.1);
+  spawnCore(4, 0);
+  spawnCore(-4, 2);
+  spawnCore(0, -4);
+  setObjective("Hold the chain reaction and destroy every Echo fragment");
+  await playCutscene([
+   {
+    camera: new THREE.Vector3(-7, 5.2, 8),
+    lookAt: new THREE.Vector3(0, 0.8, -1),
+    duration: 2000,
+     particles: {
+      position: new THREE.Vector3(0, 1.5, -1),
+      color: 0xff9a9a,
+      count: 32,
+      speed: 0.08,
+      size: 0.09
+     },
+     dialogue: [
+      "Light: The whole field is going unstable!",
+      "Echo: This is what the valley wants.",
+     "Light: No. This is what Echo wants. Keep moving."
+     ]
+    }
+   ]);
+  await spawnMiniBoss(5.5, -5.5, 0.88, 24, 0.0063);
+  await spawnMiniBoss(-6.2, -3.4, 0.96, 30, 0.006);
+  await spawnMiniBoss(0.5, -8.8, 1.02, 34, 0.0064);
+  activeCorruptionTimer = setInterval(() => {
+   triggerCorruptionEvent(false);
+  }, 3800);
+ }
+
+ if (level === 5) {
+  stagePlayer(new THREE.Vector3(0, 0, 12), 0);
+  setObjective("Defeat Echo");
+  await spawnBoss();
+ }
+
+ levelTransitioning = false;
+}
+
+// ===== CHECK =====
+function check() {
+ if (!gameStarted) return;
+ for (let i = cores.length - 1; i >= 0; i--) {
+  if (player.position.distanceTo(cores[i].position) < 2) {
+   playExplosion(cores[i].position, 0x8df7ff, 0.7);
+   scene.remove(cores[i]);
+   cores.splice(i, 1);
+   setStatus("Core stabilized");
+  }
+ }
+
+ if (!cutsceneActive && !levelTransitioning && level < 5 && cores.length === 0 && miniBosses.length === 0) {
+  levelTransitioning = true;
+  level += 1;
+  startLevel();
+ }
+}
+
+// ===== LOOP =====
+function animate() {
+ requestAnimationFrame(animate);
+
+ const delta = clock.getDelta();
+ frameDelta = delta;
+ const time = clock.elapsedTime;
+
+ if (gameStarted) {
+  move();
+  followCamera();
+  updateCombat(delta);
+  updateCores(time);
+  updateBoss(time);
+  updateMiniBosses(time);
+ } else {
+  camera.position.lerp(new THREE.Vector3(0, 7, 18), 0.04);
+  camera.lookAt(0, 1.5, 0);
+  player.rotation.y = THREE.MathUtils.lerp(player.rotation.y, -0.18, 0.06);
+ }
+
+ if (playerMixer) {
+  playerMixer.update(delta);
+ }
+
+ if (bossMixer) {
+  bossMixer.update(delta);
+ }
+
+ aura.rotation.z += 0.025;
+ lightCompanion.position.x = 0.95 + Math.sin(time * 1.8) * 0.16;
+ lightCompanion.position.y = 1.55 + Math.sin(time * 2.6) * 0.12;
+ lightCompanion.position.z = -0.35 + Math.cos(time * 1.6) * 0.1;
+ lightHalo.rotation.z += 0.04;
+ lightCore.material.opacity = 0.82 + Math.sin(time * 3.4) * 0.12;
+ floorGlow.material.opacity = 0.1 + Math.sin(time * 1.5) * 0.03;
+
+ check();
+ renderer.render(scene, camera);
+}
+
+window.addEventListener("resize", () => {
+ camera.aspect = innerWidth / innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth, innerHeight);
+});
+
+// ===== START =====
+updatePlayerHud();
+updateBossHud();
+showBossUi(false);
+ensureModelsLoading();
+animate();
+</script>
+</body>
+</html>
