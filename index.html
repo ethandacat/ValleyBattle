@@ -401,7 +401,7 @@ canvas{ display:block; }
 <div id="title-inner">
 <div id="title-eyebrow">Echo vs Light</div>
 <h1>Hold The Valley</h1>
-<div id="title-sub">Stabilize the cores, outrun the corruption, and finish Echo in a close-quarters fight.</div>
+<div id="title-sub">Veridian Valley is in trouble.</div>
 <div id="title-actions">
 <button id="start-button">Start Game</button>
 </div>
@@ -483,8 +483,8 @@ let playerRunAction = null;
 let playerIdleAction = null;
 let playerPunchAction = null;
 let bossCollisionRadius = 1.85;
-let bossHp = 100;
-const bossMaxHp = 100;
+let bossHp = 300;
+const bossMaxHp = 300;
 const maxHp = 100;
 const maxStamina = 100;
 const playerStart = new THREE.Vector3(0, 0, 10);
@@ -1069,6 +1069,7 @@ async function playCutscene(steps) {
   if (step.lookAt) {
    camera.lookAt(step.lookAt.x, step.lookAt.y, step.lookAt.z);
   }
+  hp = maxHp;
 
   const duration = step.duration ?? 1800;
   const fromPos = camera.position.clone();
